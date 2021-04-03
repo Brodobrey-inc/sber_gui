@@ -1,18 +1,9 @@
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
 import os
-from joblib import dump, load
-
-# import seaborn as sns
-from sklearn.model_selection import train_test_split, cross_val_score
-
-from sklearn.preprocessing import StandardScaler, PolynomialFeatures
-from sklearn.linear_model import Ridge, Lasso
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
-from sklearn.metrics import mean_absolute_error
+import time
+import requests
+import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.pipeline import Pipeline
+from joblib import load, dump
 
 
 DATASET_PATH = os.path.join("datasets")
@@ -107,7 +98,7 @@ class DropSameAttributes(BaseEstimator, TransformerMixin):
 
 
 if __name__ == "__main__":
-    ml_model = load("first_model.joblib")
+    '''ml_model = load("first_model.joblib")
     df0203_1118 = load_dataset(3, 3, 8, 17).reset_index(drop=True)
     df0203_1118["forecast"] = df0203_1118["latency"].shift(-30)
     df0203_1118.dropna(inplace=True)
@@ -115,4 +106,18 @@ if __name__ == "__main__":
     y_train = df0203_1118["forecast"]
     res = ml_model.predict(X_train) - y_train
     print(res.mean())
-    print(ml_model.predict(X_train.iloc[1:2, :]))
+    print(ml_model.predict(X_train.iloc[1:2, :]))'''
+
+    url = "http://127.0.0.1:5000/sb/"
+
+    df0203_1118 = load_dataset(3, 3, 8, 17).reset_index(drop=True)
+
+    for i in range(100):
+        sen = df0203_1118.iloc[0:1, :]
+        payload = {"data": sen.to_json(orient="index")}
+        headers = {"Content-Type": "application/json"}
+        df0203_1118 = df0203_1118.drop(df0203_1118.index[0])
+
+        response = requests.request("PUT", url, json=payload, headers=headers)
+        print(response)
+        time.sleep(0.2)

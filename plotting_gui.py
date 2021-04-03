@@ -1,29 +1,32 @@
 
-
 from PyQt5 import QtCore, QtGui, QtWidgets
 from pyqtgraph import PlotWidget, mkPen
-import pyqtgraph
-import sys
 import numpy as np
-import time
 import pyqtgraph
-import random
+from flask import Flask
+from flask_restful import Api, Resource, reqparse
+import threading
 from support_code_for_model import *
 
 
 class Sber:
     def __init__(self):
         df0203_1118 = load_dataset(3, 3, 6, 39).reset_index(drop=True)
-        df0203_1118["forecast"] = df0203_1118["latency"].shift(-30)
-        df0203_1118.dropna(inplace=True)
-        self.X_train = df0203_1118.drop("forecast", axis=1)
+        self.X_train = df0203_1118.iloc[0:1, :]
 
     def get(self):
-        if len(self.X_train) != 1:
+        if self.X_train.shape[0] > 1:
             result = self.X_train.iloc[0:1, :]
             self.X_train = self.X_train.drop(self.X_train.index[0])
             return result
-        return pd.DataFrame([[0 for _ in range(len(self.X_train.iloc[0]))]])
+        return None
+
+    def put(self, data):
+        self.X_train = pd.concat([self.X_train, data])
+
+
+LOCK = threading.Lock()
+SB = Sber()
 
 
 try:
@@ -78,9 +81,6 @@ class Ui_MainWindow(object):
         self.y_data1 = np.zeros(100)
 
         self.ml_model = load("first_model.joblib")
-        self.giver = data
-
-
 
         self.pushButton.clicked.connect(self.update)
         self.pushButton_2.clicked.connect(lambda: self.clear())
@@ -94,18 +94,23 @@ class Ui_MainWindow(object):
         self.chkMore.setText(_translate("MainWindow", "keep updating", None))
 
     def update(self):
-        t1=time.time()
-        data = self.giver.get()
+        LOCK.acquire()
+        data = SB.get()
+        LOCK.release()
         self.y_data = np.concatenate((self.y_data[1:], np.array([0])), axis=None)
-        self.y_data[70] = data["latency"]
-        self.y_data1[:-1] = self.y_data1[1:]
-        self.y_data1[-1] = self.ml_model.predict(data)[0]
-        C=pyqtgraph.hsvColor(time.time()/5%1,alpha=.5)
-        pen=pyqtgraph.mkPen(width=3)
+        if data is not None:
+            self.y_data[70] = data["latency"]
+            self.y_data1[:-1] = self.y_data1[1:]
+            self.y_data1[-1] = self.ml_model.predict(data)[0]
+        else:
+            self.y_data[70] = 0
+            self.y_data1[:-1] = self.y_data1[1:]
+            self.y_data1[-1] = 0
+
         self.graphicsView.plot(range(len(self.y_data)),self.y_data,pen=mkPen('b', width=2), clear=True)
         self.graphicsView.plot(range(len(self.y_data1)), self.y_data1, pen=mkPen('r', width=2))
         time.sleep(0.5)
-        print("update took %.02f ms"%((time.time()-t1)*1000))
+
         if self.chkMore.isChecked():
             QtCore.QTimer.singleShot(1, self.update) # QUICKLY repeat
 
@@ -113,7 +118,26 @@ class Ui_MainWindow(object):
         self.graphicsView.clear()
 
 
-if __name__ == "__main__":
+class Data(Resource):
+    def put(self):
+        parser = reqparse.RequestParser()
+        parser.add_argument('data')
+        params = parser.parse_args()
+        print(params)
+        LOCK.acquire()
+        SB.put(pd.read_json(params['data'], orient='index'))
+        LOCK.release()
+        return "return quote", 201
+
+
+def flask_proc():
+    app = Flask(__name__)
+    api = Api(app)
+    api.add_resource(Data, "/sb", "/sb/")
+    app.run(debug=False, )
+
+
+def ui_procc():
     import sys
     app = QtWidgets.QApplication(sys.argv)
     MainWindow = QtWidgets.QMainWindow()
@@ -121,3 +145,14 @@ if __name__ == "__main__":
     ui.setupUi(MainWindow, Sber())
     MainWindow.show()
     sys.exit(app.exec_())
+
+
+if __name__ == "__main__":
+    t1 = threading.Thread(target=flask_proc, args=())
+    t2 = threading.Thread(target=ui_procc, args=())
+
+    t1.start()
+    t2.start()
+
+    t1.join()
+    t2.join()
