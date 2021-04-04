@@ -109,7 +109,7 @@ class Ui_MainWindow(object):
 
         self.graphicsView.plot(range(len(self.y_data)),self.y_data,pen=mkPen('b', width=2), clear=True)
         self.graphicsView.plot(range(len(self.y_data1)), self.y_data1, pen=mkPen('r', width=2))
-        time.sleep(0.5)
+        time.sleep(0.01)
 
         if self.chkMore.isChecked():
             QtCore.QTimer.singleShot(1, self.update) # QUICKLY repeat
@@ -125,9 +125,9 @@ class Data(Resource):
         params = parser.parse_args()
         print(params)
         LOCK.acquire()
-        SB.put(pd.read_json(params['data'], orient='index'))
+        SB.put(pd.read_json(params['data']))
         LOCK.release()
-        return "return quote", 201
+        return "Ok", 201
 
 
 def flask_proc():
