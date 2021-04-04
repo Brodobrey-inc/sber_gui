@@ -9,7 +9,7 @@ from joblib import load, dump
 DATASET_PATH = os.path.join("datasets")
 
 
-def load_dataset(day: int, month: str, hour: str, minute: str, paths_to_check: list = ["3rd", "4th"], search_for_special_string: str = "", index_col_name: str = "Unnamed: 0"):
+def load_dataset(day: int, month: str, hour: str, minute: str, paths_to_check: list = ["3rd"], search_for_special_string: str = "", index_col_name: str = "Unnamed: 0"):
     for folder in paths_to_check:
         path = os.path.join(DATASET_PATH, folder)
         for elem in os.listdir(path):
